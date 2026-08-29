@@ -78,7 +78,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, onSnapshot,
+import { getFirestore, initializeFirestore, doc, getDoc, setDoc, updateDoc, collection, onSnapshot,
          addDoc, deleteDoc, serverTimestamp, writeBatch, query, where }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
@@ -87,15 +87,20 @@ import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, onSnapshot,
    Create a separate project from baseball-runs-pool.
    ============================================================ */
 const firebaseConfig = {
-  apiKey:            "REPLACE_ME",
-  authDomain:        "REPLACE_ME.firebaseapp.com",
-  projectId:         "REPLACE_ME",
-  storageBucket:     "REPLACE_ME.appspot.com",
-  messagingSenderId: "REPLACE_ME",
-  appId:             "REPLACE_ME"
+  apiKey:            "AIzaSyBMNLal0sv8tpBVDt7YOBBe8dYC2Fobaew",
+  authDomain:        "nfl-picks-pool-9d38b.firebaseapp.com",
+  projectId:         "nfl-picks-pool-9d38b",
+  storageBucket:     "nfl-picks-pool-9d38b.firebasestorage.app",
+  messagingSenderId: "308225144470",
+  appId:             "1:308225144470:web:86b5d6bf86b5d8e7f5b4b7",
+  measurementId:     "G-SZLTHKKBE3"
 };
 const fbApp = initializeApp(firebaseConfig);
-const db    = getFirestore(fbApp);
+// Firestore's default streaming connection (WebChannel) gets broken by some
+// antivirus, VPNs, proxies and extensions — the SDK then reports "client is
+// offline" with no HTTP error at all. Long polling uses ordinary requests
+// instead. Slightly chattier; invisible at four users.
+const db    = initializeFirestore(fbApp, { experimentalForceLongPolling: true });
 const POOL  = doc(db,"pool","main");
 const GAMES = collection(db,"games");
 const PICKS = collection(db,"picks");
@@ -303,21 +308,41 @@ function parseSlate(text, week){
    ============================================================ */
 const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
+function fatal(msg){
+  document.getElementById("app").innerHTML =
+    `<div class="card"><h2 style="color:#f85149">Couldn't start</h2>
+     <p class="tiny mono" style="white-space:pre-wrap">${esc(msg)}</p>
+     <p class="tiny muted">Press F12 → Console for the full error.</p></div>`;
+}
+window.addEventListener("error", e => fatal(e.message));
+window.addEventListener("unhandledrejection", e => fatal(String(e.reason && e.reason.message || e.reason)));
+
 async function boot(){
-  const snap = await getDoc(POOL);
-  if(!snap.exists()){
-    await setDoc(POOL,{ season:SEASON, currentWeek:"1", finalized:{},
-      players:[
-        {id:"p1",name:"Tim",  passcode:"1111", isAdmin:true},
-        {id:"p2",name:"Player 2",passcode:"2222", isAdmin:false},
-        {id:"p3",name:"Player 3",passcode:"3333", isAdmin:false},
-        {id:"p4",name:"Player 4",passcode:"4444", isAdmin:false}
-      ],
-      tiebreakers:{} });
+  render();                                  // paint something immediately
+  try{
+    const snap = await getDoc(POOL);
+    if(!snap.exists()){
+      await setDoc(POOL,{ season:SEASON, currentWeek:"1", finalized:{},
+        players:[
+          {id:"p1",name:"Tim",  passcode:"1111", isAdmin:true},
+          {id:"p2",name:"Player 2",passcode:"2222", isAdmin:false},
+          {id:"p3",name:"Player 3",passcode:"3333", isAdmin:false},
+          {id:"p4",name:"Player 4",passcode:"4444", isAdmin:false}
+        ],
+        tiebreakers:{} });
+    }
+  }catch(e){
+    fatal("Firestore refused the first read/write.\n\n"+e.message+
+      "\n\nUsually this means the Firebase config is wrong, or the rules weren't published.");
+    return;
   }
-  onSnapshot(POOL, s=>{ pool = s.data(); if(!viewWeek) viewWeek = pool.currentWeek; render(); });
-  onSnapshot(GAMES, s=>{ games = s.docs.map(d=>({id:d.id,...d.data()})); render(); });
-  onSnapshot(PICKS, s=>{ picks = s.docs.map(d=>({id:d.id,...d.data()})); render(); });
+
+  onSnapshot(POOL, s=>{ pool = s.data(); if(!viewWeek) viewWeek = pool.currentWeek; render(); },
+             err=>fatal("pool listener: "+err.message));
+  onSnapshot(GAMES, s=>{ games = s.docs.map(d=>({id:d.id,...d.data()})); render(); },
+             err=>fatal("games listener: "+err.message));
+  onSnapshot(PICKS, s=>{ picks = s.docs.map(d=>({id:d.id,...d.data()})); render(); },
+             err=>fatal("picks listener: "+err.message));
 
   const saved = localStorage.getItem("ffp_player");
   if(saved) setTimeout(()=>{ if(pool){ me = (pool.players||[]).find(p=>p.id===saved)||null; render(); } },400);
