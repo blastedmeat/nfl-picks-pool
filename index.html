@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Family Football Pool</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2430; --line:#2a3441;
+    --txt:#e6edf3; --dim:#8b949e; --dimmer:#6e7681;
+    --acc:#3fb950; --acc2:#2ea043; --warn:#d29922; --bad:#f85149;
+    --chalk:#58a6ff;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    padding-bottom:env(safe-area-inset-bottom)}
+  h1,h2,h3{margin:0 0 10px;font-weight:650;letter-spacing:-.01em}
+  h1{font-size:19px} h2{font-size:17px} h3{font-size:14px}
+  .wrap{max-width:960px;margin:0 auto;padding:12px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+  .muted{color:var(--dim)} .tiny{font-size:12px} .mono{font-variant-numeric:tabular-nums}
+  button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--txt);padding:9px 13px}
+  button:hover{border-color:#3d4a5c}
+  button:focus-visible{outline:2px solid var(--chalk);outline-offset:2px}
+  button.primary{background:var(--acc2);border-color:var(--acc2);color:#fff;font-weight:600}
+  button.primary:hover{background:var(--acc)}
+  button.danger{background:#3d1d1d;border-color:#5c2626;color:#ff9d95}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  input,select,textarea{font:inherit;background:#0b1017;color:var(--txt);
+    border:1px solid var(--line);border-radius:8px;padding:9px 11px;width:100%}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--chalk);outline-offset:-1px;border-color:transparent}
+  textarea{min-height:150px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;line-height:1.6}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .grow{flex:1;min-width:0}
+  .tabs{display:flex;gap:4px;overflow-x:auto;padding:3px;background:var(--panel);
+    border:1px solid var(--line);border-radius:10px;margin-bottom:12px;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs button{border:0;background:transparent;color:var(--dim);white-space:nowrap;padding:8px 13px;font-size:14px}
+  .tabs button.active{background:var(--panel2);color:var(--txt);font-weight:600}
+  table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+  th,td{padding:8px 6px;text-align:left;border-bottom:1px solid var(--line);font-size:14px}
+  th{color:var(--dim);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  td.num,th.num{text-align:right}
+  .pill{display:inline-block;padding:2px 7px;border-radius:20px;font-size:11px;
+    background:var(--panel2);color:var(--dim);border:1px solid var(--line);white-space:nowrap}
+  .pill.live{background:#3d2c05;color:#e3b341;border-color:#5c4405}
+  .pill.locked{background:#2a2035;color:#b392f0;border-color:#3d2f4d}
+  .pill.win{background:#12261a;color:#56d364;border-color:#1d4429}
+  .pill.loss{background:#341a1a;color:#f85149;border-color:#5c2626}
+
+  .game{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;background:var(--panel2)}
+  .game.picked{border-color:var(--acc2);background:#12261a}
+  .game.dead{opacity:.5}
+  .game-hd{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+  .sides{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .side{padding:10px 8px;border:1px solid var(--line);border-radius:8px;background:#0b1017;
+    text-align:center;font-weight:600;font-size:14px}
+  .side .ln{display:block;color:var(--dim);font-weight:500;font-size:12px;margin-top:2px}
+  .side.on{background:var(--acc2);border-color:var(--acc2);color:#fff}
+  .side.on .ln{color:#d5f5dd}
+  .side.other{background:#1a1f28;border-color:#39414d}
+  .counter{position:sticky;top:0;z-index:20;background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;padding:10px 13px;margin-bottom:12px;display:flex;
+    justify-content:space-between;align-items:center;backdrop-filter:blur(8px)}
+  .counter b{font-size:17px}
+  .err{background:#341a1a;border:1px solid #5c2626;color:#ff9d95;padding:9px 11px;border-radius:8px;margin-bottom:10px;font-size:13px}
+  .ok{background:#12261a;border:1px solid #1d4429;color:#56d364;padding:9px 11px;border-radius:8px;margin-bottom:10px;font-size:13px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .scroll{overflow-x:auto}
+  @media (max-width:560px){ .grid2{grid-template-columns:1fr} }
+  @media (prefers-reduced-motion:no-preference){ .game{transition:border-color .12s,background .12s} }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, onSnapshot,
+         addDoc, deleteDoc, serverTimestamp, writeBatch, query, where }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+/* ============================================================
+   1. FIREBASE  — replace with your new project's config.
+   Create a separate project from baseball-runs-pool.
+   ============================================================ */
+const firebaseConfig = {
+  apiKey:            "REPLACE_ME",
+  authDomain:        "REPLACE_ME.firebaseapp.com",
+  projectId:         "REPLACE_ME",
+  storageBucket:     "REPLACE_ME.appspot.com",
+  messagingSenderId: "REPLACE_ME",
+  appId:             "REPLACE_ME"
+};
+const fbApp = initializeApp(firebaseConfig);
+const db    = getFirestore(fbApp);
+const POOL  = doc(db,"pool","main");
+const GAMES = collection(db,"games");
+const PICKS = collection(db,"picks");
+const AUDIT = collection(db,"audit");
+
+/* ============================================================
+   2. CONSTANTS
+   ============================================================ */
+const SEASON = 2026;
+const WEEKS  = [];
+for (let i=1;i<=18;i++) WEEKS.push({id:String(i), label:"Week "+i, required:5, playoff:false});
+WEEKS.push({id:"WC",   label:"Wild Card",   required:null, playoff:true});
+WEEKS.push({id:"DIV",  label:"Divisional",  required:null, playoff:true});
+WEEKS.push({id:"CONF", label:"Conference",  required:null, playoff:true});
+WEEKS.push({id:"SB",   label:"Super Bowl",  required:null, playoff:true});
+const weekById = id => WEEKS.find(w=>w.id===String(id));
+
+const TEAMS = ["ARI","ATL","BAL","BUF","CAR","CHI","CIN","CLE","DAL","DEN","DET","GB","HOU",
+  "IND","JAX","KC","LAC","LAR","LV","MIA","MIN","NE","NO","NYG","NYJ","PHI","PIT","SEA","SF",
+  "TB","TEN","WAS"];
+
+/* ============================================================
+   3. STATE
+   ============================================================ */
+let pool  = null;      // pool/main doc
+let games = [];        // all game docs
+let picks = [];        // all pick docs
+let me    = null;      // logged-in player object
+let tab   = "picks";
+let atab  = "lines";
+let viewWeek = null;
+let flash = null;      // {kind:'ok'|'err', msg}
+let now   = Date.now();
+
+setInterval(()=>{ now = Date.now(); if(tab==="picks"||tab==="board") render(); }, 20000);
+
+/* ============================================================
+   4. TIME HELPERS  (all kickoffs stored as ISO with ET offset)
+   ============================================================ */
+// DST 2026: Mar 8 – Nov 1.  DST 2027: Mar 14 – Nov 7.
+function etOffset(y,m,d){                       // m = 1-12
+  const t = new Date(Date.UTC(y,m-1,d));
+  const start = y===2026 ? Date.UTC(2026,2,8)  : Date.UTC(2027,2,14);
+  const end   = y===2026 ? Date.UTC(2026,10,1) : Date.UTC(2027,10,7);
+  return (t>=start && t<end) ? "-04:00" : "-05:00";
+}
+// "9/13 1:00p" (+ season year inference) -> ISO string
+function parseKick(str){
+  const m = String(str).trim().match(/^(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})\s*([ap])m?$/i);
+  if(!m) return null;
+  let [,mo,da,hh,mi,ap] = m;
+  mo=+mo; da=+da; hh=+hh; mi=+mi; ap=ap.toLowerCase();
+  if(ap==="p" && hh!==12) hh+=12;
+  if(ap==="a" && hh===12) hh=0;
+  const yr = mo>=8 ? SEASON : SEASON+1;          // Aug-Dec = season yr, Jan-Feb = next
+  const p2 = n=>String(n).padStart(2,"0");
+  return `${yr}-${p2(mo)}-${p2(da)}T${p2(hh)}:${p2(mi)}:00${etOffset(yr,mo,da)}`;
+}
+function fmtKick(iso){
+  if(!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleString("en-US",{weekday:"short",month:"numeric",day:"numeric",
+    hour:"numeric",minute:"2-digit",timeZone:"America/New_York"}).replace(",","");
+}
+const isLocked = g => !!g.kickoff && now >= new Date(g.kickoff).getTime();
+function untilKick(iso){
+  const ms = new Date(iso).getTime() - now;
+  if(ms<=0) return "locked";
+  const mins = Math.floor(ms/60000), hrs = Math.floor(mins/60), days = Math.floor(hrs/24);
+  if(days>0) return days+"d "+(hrs%24)+"h";
+  if(hrs>0)  return hrs+"h "+(mins%60)+"m";
+  return mins+"m";
+}
+
+/* ============================================================
+   5. LINE HELPERS  — the half-point rule
+   Whole numbers get a hook added toward the FAVORITE.
+   Totals get a hook added upward. Nothing ever pushes.
+   ============================================================ */
+function hook(n){
+  const v = Math.abs(Number(n));
+  if(!isFinite(v)) return null;
+  return (v % 1 === 0) ? v + 0.5 : v;
+}
+const fmtNum = n => (Math.round(n*10)/10).toFixed(1).replace(/\.0$/,".0");
+
+// Display label for a side of a game
+function sideLabel(g, side){
+  if(g.betType==="total") return side==="over" ? "Over" : "Under";
+  return side;
+}
+function sideLine(g, side){
+  if(g.betType==="total") return fmtNum(g.line);
+  return side===g.favorite ? "-"+fmtNum(g.line) : "+"+fmtNum(g.line);
+}
+
+/* ============================================================
+   6. RESULT RESOLUTION
+   ============================================================ */
+function gameResult(g){
+  if(g.awayScore==null || g.homeScore==null) return null;
+  const a=Number(g.awayScore), h=Number(g.homeScore);
+  if(g.betType==="total") return (a+h) > g.line ? "over" : "under";
+  const favScore = g.favorite===g.home ? h : a;
+  const dogScore = g.favorite===g.home ? a : h;
+  const dog      = g.favorite===g.home ? g.away : g.home;
+  return (favScore - dogScore) > g.line ? g.favorite : dog;
+}
+const pickWon = p => { const g=games.find(x=>x.id===p.gameId); if(!g) return null;
+  const r=gameResult(g); return r==null?null:(r===p.side); };
+
+/* ============================================================
+   7. DERIVED
+   ============================================================ */
+const weekGames  = wk => games.filter(g=>g.week===String(wk))
+                              .sort((a,b)=> (a.kickoff||"").localeCompare(b.kickoff||""));
+const myPicks    = (wk,pid) => picks.filter(p=>p.week===String(wk)&&p.playerId===pid);
+const requiredFor= wk => { const w=weekById(wk); return w.playoff ? weekGames(wk).length : w.required; };
+
+function standings(){
+  return (pool.players||[]).map(pl=>{
+    let w=0,l=0,pend=0;
+    picks.filter(p=>p.playerId===pl.id).forEach(p=>{
+      const r=pickWon(p); if(r===null) pend++; else r?w++:l++;
+    });
+    const wk = {};
+    picks.filter(p=>p.playerId===pl.id).forEach(p=>{
+      const r=pickWon(p); if(r===null) return;
+      wk[p.week] = (wk[p.week]||0) + (r?1:0);
+    });
+    let weeklyWins = 0;
+    WEEKS.forEach(W=>{
+      if(!(pool.finalized||{})[W.id]) return;
+      const scores = (pool.players||[]).map(q=>{
+        let c=0; picks.filter(p=>p.playerId===q.id&&p.week===W.id)
+                      .forEach(p=>{ if(pickWon(p)===true) c++; });
+        return {id:q.id,c};
+      });
+      const top = Math.max(...scores.map(s=>s.c));
+      if(top>0 && scores.find(s=>s.id===pl.id).c===top) weeklyWins++;
+    });
+    return {...pl, w, l, pend, weeklyWins, made:w+l+pend};
+  }).sort((a,b)=> b.w-a.w || b.weeklyWins-a.weeklyWins || a.name.localeCompare(b.name));
+}
+
+/* ============================================================
+   8. AUDIT
+   ============================================================ */
+async function logAudit(action, before, after){
+  try{
+    await addDoc(AUDIT,{ ts:serverTimestamp(), at:new Date().toISOString(),
+      admin: me? me.name : "?", action,
+      before: before==null?null:JSON.stringify(before),
+      after:  after ==null?null:JSON.stringify(after) });
+  }catch(e){ console.warn("audit failed",e); }
+}
+
+/* ============================================================
+   9. SLATE PARSER
+   Spread:  NE @ SEA | SEA -3    | 9/9 8:20p
+   Pick'em: NE @ SEA | PK        | 9/9 8:20p     (home laid -0.5)
+   Total:   NE @ SEA | TOTAL 48  | 2/14 6:30p
+   ============================================================ */
+function parseSlate(text, week){
+  const out=[], errs=[];
+  text.split(/\r?\n/).forEach((raw,i)=>{
+    const line = raw.trim();
+    if(!line || line.startsWith("#")) return;
+    const parts = line.split("|").map(s=>s.trim());
+    if(parts.length<3){ errs.push(`Line ${i+1}: need 3 parts separated by |`); return; }
+    const [matchup, spread, when] = parts;
+
+    const mm = matchup.toUpperCase().match(/^([A-Z]{2,3})\s*@\s*([A-Z]{2,3})$/);
+    if(!mm){ errs.push(`Line ${i+1}: matchup must read "AWAY @ HOME"`); return; }
+    const [,away,home] = mm;
+    if(!TEAMS.includes(away)) errs.push(`Line ${i+1}: unknown team ${away}`);
+    if(!TEAMS.includes(home)) errs.push(`Line ${i+1}: unknown team ${home}`);
+
+    const kick = parseKick(when);
+    if(!kick){ errs.push(`Line ${i+1}: time must read "9/13 1:00p"`); return; }
+
+    const g = { season:SEASON, week:String(week), away, home, kickoff:kick,
+                kickoffMs: new Date(kick).getTime(),
+                awayScore:null, homeScore:null, postedAt:new Date().toISOString() };
+
+    const tot = spread.toUpperCase().match(/^(?:TOTAL|O\/U|OU)\s*(\d+(?:\.\d+)?)$/);
+    if(tot){
+      g.betType="total"; g.favorite=null; g.line=hook(tot[1]);
+    } else if(/^PK$/i.test(spread)){
+      g.betType="spread"; g.favorite=home; g.line=0.5;
+    } else {
+      const sm = spread.toUpperCase().match(/^([A-Z]{2,3})\s*-?\s*(\d+(?:\.\d+)?)$/);
+      if(!sm){ errs.push(`Line ${i+1}: spread must read "SEA -3", "PK", or "TOTAL 48"`); return; }
+      if(sm[1]!==away && sm[1]!==home){ errs.push(`Line ${i+1}: ${sm[1]} isn't in that game`); return; }
+      g.betType="spread"; g.favorite=sm[1]; g.line=hook(sm[2]);
+    }
+    if(g.line==null){ errs.push(`Line ${i+1}: bad number`); return; }
+    out.push(g);
+  });
+  return {games:out, errs};
+}
+
+/* ============================================================
+   10. BOOT
+   ============================================================ */
+const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+async function boot(){
+  const snap = await getDoc(POOL);
+  if(!snap.exists()){
+    await setDoc(POOL,{ season:SEASON, currentWeek:"1", finalized:{},
+      players:[
+        {id:"p1",name:"Tim",  passcode:"1111", isAdmin:true},
+        {id:"p2",name:"Player 2",passcode:"2222", isAdmin:false},
+        {id:"p3",name:"Player 3",passcode:"3333", isAdmin:false},
+        {id:"p4",name:"Player 4",passcode:"4444", isAdmin:false}
+      ],
+      tiebreakers:{} });
+  }
+  onSnapshot(POOL, s=>{ pool = s.data(); if(!viewWeek) viewWeek = pool.currentWeek; render(); });
+  onSnapshot(GAMES, s=>{ games = s.docs.map(d=>({id:d.id,...d.data()})); render(); });
+  onSnapshot(PICKS, s=>{ picks = s.docs.map(d=>({id:d.id,...d.data()})); render(); });
+
+  const saved = localStorage.getItem("ffp_player");
+  if(saved) setTimeout(()=>{ if(pool){ me = (pool.players||[]).find(p=>p.id===saved)||null; render(); } },400);
+}
+
+/* ============================================================
+   11. RENDER
+   ============================================================ */
+function render(){
+  const el = document.getElementById("app");
+  if(!pool){ el.innerHTML = `<div class="card muted">Connecting…</div>`; return; }
+  if(!me)  { el.innerHTML = renderLogin(); return; }
+
+  const tabs = [["picks","Picks"],["board","Board"],["standings","Standings"]];
+  if(me.isAdmin) tabs.push(["admin","Admin"]);
+
+  el.innerHTML = `
+    <div class="row" style="justify-content:space-between;margin-bottom:12px">
+      <h1 style="margin:0">Family Football Pool <span class="muted tiny">${SEASON}</span></h1>
+      <button onclick="signOut()">${esc(me.name)} · Sign out</button>
+    </div>
+    <div class="tabs">${tabs.map(([k,lbl])=>
+      `<button class="${tab===k?"active":""}" onclick="go('${k}')">${lbl}</button>`).join("")}</div>
+    ${flash?`<div class="${flash.kind}">${esc(flash.msg)}</div>`:""}
+    ${ tab==="picks"    ? renderPicks()
+     : tab==="board"    ? renderBoard()
+     : tab==="standings"? renderStandings()
+     :                    renderAdmin() }`;
+  flash = null;
+}
+
+function renderLogin(){
+  return `<div class="card" style="max-width:340px;margin:60px auto">
+    <h2>Family Football Pool</h2>
+    <p class="muted tiny">Pick 5 against the spread each week. Every playoff game. 103 picks.</p>
+    <select id="who" style="margin-bottom:8px">
+      ${(pool.players||[]).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("")}
+    </select>
+    <input id="pc" type="password" inputmode="numeric" placeholder="Passcode" style="margin-bottom:8px"
+      onkeydown="if(event.key==='Enter')signIn()">
+    <button class="primary" style="width:100%" onclick="signIn()">Sign in</button>
+  </div>`;
+}
+
+function renderWeekPicker(){
+  return `<select onchange="setView(this.value)" style="max-width:170px">
+    ${WEEKS.map(w=>`<option value="${w.id}" ${viewWeek===w.id?"selected":""}>${w.label}</option>`).join("")}
+  </select>`;
+}
+
+/* ---------- PICKS ---------- */
+function renderPicks(){
+  const wk  = viewWeek, W = weekById(wk);
+  const gs  = weekGames(wk);
+  const mine= myPicks(wk, me.id);
+  const req = requiredFor(wk);
+  const fin = (pool.finalized||{})[wk];
+
+  if(!gs.length) return `<div class="row" style="margin-bottom:12px">${renderWeekPicker()}</div>
+    <div class="card muted">No lines posted for ${W.label} yet.</div>`;
+
+  const open = gs.filter(g=>!isLocked(g)).length;
+
+  const body = gs.map(g=>{
+    const locked = isLocked(g);
+    const mp   = mine.find(p=>p.gameId===g.id);
+    const res  = gameResult(g);
+    const sides= g.betType==="total" ? ["over","under"] : [g.away,g.home];
+    const full = mine.length>=req && !mp;
+
+    return `<div class="game ${mp?"picked":""} ${locked&&!mp?"dead":""}">
+      <div class="game-hd">
+        <div>
+          <b>${g.betType==="total"?`${g.away} @ ${g.home} — Total`:`${g.away} @ ${g.home}`}</b>
+          <div class="tiny muted mono">${fmtKick(g.kickoff)} ET</div>
+        </div>
+        <div style="text-align:right">
+          ${ locked ? `<span class="pill locked">Locked</span>`
+                    : `<span class="pill live">${untilKick(g.kickoff)}</span>` }
+          ${ res ? `<div class="tiny mono muted" style="margin-top:3px">${g.awayScore}-${g.homeScore}</div>`:"" }
+        </div>
+      </div>
+      <div class="sides">
+        ${sides.map(s=>{
+          const on = mp && mp.side===s;
+          const cls = on ? "side on" : (mp ? "side other" : "side");
+          const dis = locked || (full && !on);
+          return `<button class="${cls}" style="width:100%" ${dis?"disabled":""}
+            onclick="togglePick('${g.id}','${s}')">
+            ${esc(sideLabel(g,s))}<span class="ln mono">${sideLine(g,s)}</span></button>`;
+        }).join("")}
+      </div>
+      ${ res && mp ? `<div class="tiny" style="margin-top:7px">
+            <span class="pill ${res===mp.side?"win":"loss"}">${res===mp.side?"Win":"Loss"}</span></div>`:"" }
+    </div>`;
+  }).join("");
+
+  const tb = wk==="SB" ? renderTiebreak() : "";
+
+  return `<div class="row" style="margin-bottom:12px">${renderWeekPicker()}
+      ${fin?`<span class="pill">Final</span>`:""}</div>
+    <div class="counter">
+      <div><b class="mono">${mine.length}/${req}</b> <span class="muted tiny">picks made</span></div>
+      <div class="tiny muted">${open} game${open===1?"":"s"} still open</div>
+    </div>
+    ${ mine.length<req && open<(req-mine.length)
+       ? `<div class="err">Only ${open} game${open===1?"":"s"} left unlocked — you can't reach ${req} this week.</div>`:"" }
+    ${body}${tb}`;
+}
+
+function renderTiebreak(){
+  const cur = ((pool.tiebreakers||{})[me.id])||{};
+  const sb  = weekGames("SB")[0];
+  const locked = sb ? isLocked(sb) : false;
+  return `<div class="card" style="margin-top:14px">
+    <h3>Tiebreaker — Super Bowl TD scorer</h3>
+    <p class="tiny muted">Only used if the season ends in a tie. Locks at kickoff. Resolved by hand.</p>
+    <input id="tbv" value="${esc(cur.text||"")}" placeholder="Player name" ${locked?"disabled":""}>
+    ${ locked
+      ? `<p class="tiny muted" style="margin:8px 0 0">Locked${cur.at?` — submitted ${fmtKick(cur.at)} ET`:""}.</p>`
+      : `<button class="primary" style="margin-top:8px" onclick="saveTiebreak()">Save pick</button>` }
+  </div>`;
+}
+
+/* ---------- BOARD ---------- */
+function renderBoard(){
+  const wk = viewWeek, gs = weekGames(wk), pls = pool.players||[];
+  if(!gs.length) return `<div class="row" style="margin-bottom:12px">${renderWeekPicker()}</div>
+    <div class="card muted">Nothing posted yet.</div>`;
+
+  const rows = gs.map(g=>{
+    const locked = isLocked(g), res = gameResult(g);
+    const cells = pls.map(pl=>{
+      const p = picks.find(x=>x.week===String(wk)&&x.playerId===pl.id&&x.gameId===g.id);
+      if(!p) return `<td class="muted">—</td>`;
+      if(!locked) return `<td><span class="pill">Hidden</span></td>`;
+      const won = res==null?null:(res===p.side);
+      return `<td><span class="pill ${won===null?"":won?"win":"loss"}">${esc(sideLabel(g,p.side))}</span></td>`;
+    }).join("");
+    return `<tr>
+      <td><div><b>${g.away} @ ${g.home}</b>${g.betType==="total"?' <span class="tiny muted">O/U</span>':""}</div>
+          <div class="tiny muted mono">${g.betType==="total"?fmtNum(g.line):g.favorite+" -"+fmtNum(g.line)}
+          ${res?` · ${g.awayScore}-${g.homeScore}`:""}</div></td>
+      ${cells}</tr>`;
+  }).join("");
+
+  return `<div class="row" style="margin-bottom:12px">${renderWeekPicker()}</div>
+    <div class="card"><p class="tiny muted" style="margin:0 0 10px">
+      Picks stay hidden until each game kicks off.</p>
+      <div class="scroll"><table><thead><tr><th>Game</th>
+      ${pls.map(p=>`<th>${esc(p.name)}</th>`).join("")}</tr></thead>
+      <tbody>${rows}</tbody></table></div></div>`;
+}
+
+/* ---------- STANDINGS ---------- */
+function renderStandings(){
+  const st = standings();
+  const total = st.length? st[0].w+st[0].l+st[0].pend : 0;
+  return `<div class="card">
+    <h2>Season standings</h2>
+    <p class="tiny muted">Straight wins across 103 picks. Ties break on weekly wins, then head-to-head on common picks, then co-champions.</p>
+    <div class="scroll"><table><thead><tr><th>#</th><th>Player</th>
+      <th class="num">W</th><th class="num">L</th><th class="num">Pct</th>
+      <th class="num">Wk wins</th><th class="num">Made</th></tr></thead><tbody>
+      ${st.map((p,i)=>{
+        const dec=p.w+p.l;
+        return `<tr><td class="muted">${i+1}</td><td><b>${esc(p.name)}</b></td>
+          <td class="num">${p.w}</td><td class="num">${p.l}</td>
+          <td class="num">${dec?(p.w/dec).toFixed(3).slice(1):"—"}</td>
+          <td class="num">${p.weeklyWins}</td>
+          <td class="num muted">${p.made}/103</td></tr>`;
+      }).join("")}
+    </tbody></table></div></div>
+    <div class="card"><h3>By week</h3><div class="scroll"><table><thead><tr><th>Week</th>
+      ${st.map(p=>`<th>${esc(p.name)}</th>`).join("")}</tr></thead><tbody>
+      ${WEEKS.filter(W=>weekGames(W.id).length).map(W=>{
+        const cells = st.map(p=>{
+          const mp = myPicks(W.id,p.id);
+          let w=0,dec=0; mp.forEach(x=>{const r=pickWon(x); if(r!==null){dec++; if(r)w++;}});
+          return `<td class="mono">${dec?`${w}-${dec-w}`:'<span class="muted">—</span>'}</td>`;
+        }).join("");
+        return `<tr><td>${W.label} ${(pool.finalized||{})[W.id]?'<span class="pill">F</span>':""}</td>${cells}</tr>`;
+      }).join("")}
+    </tbody></table></div></div>`;
+}
+
+/* ---------- ADMIN ---------- */
+function renderAdmin(){
+  const tabsA = [["lines","Post Lines"],["results","Enter Results"],["manage","Week Management"],
+                 ["picks","Enter Pick"],["players","Players"],["audit","Audit Log"]];
+  return `<div class="tabs">${tabsA.map(([k,l])=>
+      `<button class="${atab===k?"active":""}" onclick="goA('${k}')">${l}</button>`).join("")}</div>
+    ${ atab==="lines"  ? adminLines()
+     : atab==="results"? adminResults()
+     : atab==="manage" ? adminManage()
+     : atab==="picks"  ? adminPicks()
+     : atab==="players"? adminPlayers()
+     :                   adminAudit() }`;
+}
+
+function adminLines(){
+  const wk = viewWeek, gs = weekGames(wk);
+  return `<div class="card">
+    <div class="row" style="margin-bottom:10px">${renderWeekPicker()}</div>
+    <h3>Paste the slate</h3>
+    <p class="tiny muted">One game per line. Whole numbers get a hook toward the favorite automatically —
+      <span class="mono">SEA -3</span> posts as <span class="mono">-3.5</span>. Nothing pushes.</p>
+    <textarea id="slate" placeholder="NE @ SEA | SEA -3 | 9/9 8:20p
+BAL @ IND | BAL -2.5 | 9/13 1:00p
+LV @ CLE | PK | 9/13 1:00p
+NE @ SEA | TOTAL 48 | 2/14 6:30p"></textarea>
+    <div class="row" style="margin-top:9px">
+      <button onclick="previewSlate()">Preview</button>
+      <button class="primary" onclick="publishSlate()">Publish lines</button>
+    </div>
+    <div id="preview"></div>
+  </div>
+  ${gs.length?`<div class="card"><h3>Posted — ${weekById(wk).label}</h3>
+    <div class="scroll"><table><thead><tr><th>Game</th><th>Line</th><th>Kickoff</th><th></th></tr></thead><tbody>
+    ${gs.map(g=>`<tr>
+      <td>${g.away} @ ${g.home}${g.betType==="total"?' <span class="tiny muted">O/U</span>':""}</td>
+      <td class="mono"><input value="${g.betType==="total"?fmtNum(g.line):g.favorite+" -"+fmtNum(g.line)}"
+          style="width:110px;padding:5px 7px" onchange="editLine('${g.id}',this.value)"></td>
+      <td class="tiny mono">${fmtKick(g.kickoff)}</td>
+      <td><button class="danger" style="padding:5px 9px" onclick="delGame('${g.id}')">Delete</button></td>
+    </tr>`).join("")}
+    </tbody></table></div>
+    <p class="tiny muted" style="margin:9px 0 0">Editing a posted line writes to the audit log.</p></div>`:""}`;
+}
+
+function adminResults(){
+  const gs = weekGames(viewWeek);
+  return `<div class="card">
+    <div class="row" style="margin-bottom:10px">${renderWeekPicker()}</div>
+    <h3>Final scores</h3>
+    ${ gs.length ? `<div class="scroll"><table><thead><tr><th>Game</th>
+        <th class="num">Away</th><th class="num">Home</th><th>Result</th></tr></thead><tbody>
+      ${gs.map(g=>{ const r=gameResult(g); return `<tr>
+        <td><div>${g.away} @ ${g.home}</div>
+            <div class="tiny muted mono">${g.betType==="total"?"O/U "+fmtNum(g.line):g.favorite+" -"+fmtNum(g.line)}</div></td>
+        <td class="num"><input type="number" value="${g.awayScore??""}" style="width:66px;padding:5px"
+            onchange="setScore('${g.id}','awayScore',this.value)"></td>
+        <td class="num"><input type="number" value="${g.homeScore??""}" style="width:66px;padding:5px"
+            onchange="setScore('${g.id}','homeScore',this.value)"></td>
+        <td>${r?`<span class="pill win">${esc(sideLabel(g,r))}</span>`:'<span class="muted tiny">—</span>'}</td>
+      </tr>`;}).join("")}</tbody></table></div>` : `<p class="muted">No games posted.</p>` }
+  </div>`;
+}
+
+function adminManage(){
+  const wk = viewWeek, fin = (pool.finalized||{})[wk];
+  const gs = weekGames(wk), done = gs.filter(g=>gameResult(g)!==null).length;
+  return `<div class="card">
+    <div class="row" style="margin-bottom:10px">${renderWeekPicker()}</div>
+    <h3>${weekById(wk).label}</h3>
+    <p class="tiny muted">${done} of ${gs.length} games scored.
+      ${fin?"This week is final — weekly wins are counted.":"Not final yet."}</p>
+    <div class="row">
+      ${ fin ? `<button class="danger" onclick="finalize('${wk}',false)">Reopen week</button>`
+             : `<button class="primary" onclick="finalize('${wk}',true)">Finalize week</button>` }
+    </div>
+  </div>
+  <div class="card"><h3>Clear this week</h3>
+    <p class="tiny muted">Deletes every game and pick for ${weekById(wk).label}. Use it to wipe test
+      data before the real lines go up, or to start over after a bad paste. Logged.</p>
+    <button class="danger" onclick="clearWeek('${wk}')">Clear ${weekById(wk).label}</button>
+  </div>
+  <div class="card"><h3>Current week</h3>
+    <p class="tiny muted">Sets which week players land on when they sign in.</p>
+    <div class="row"><select id="cw" style="max-width:170px">
+      ${WEEKS.map(w=>`<option value="${w.id}" ${pool.currentWeek===w.id?"selected":""}>${w.label}</option>`).join("")}
+    </select><button onclick="setCurrentWeek()">Set</button></div>
+  </div>`;
+}
+
+function adminPicks(){
+  const wk = viewWeek, gs = weekGames(wk);
+  return `<div class="card">
+    <div class="row" style="margin-bottom:10px">${renderWeekPicker()}
+      <select id="apw" style="max-width:150px">
+        ${(pool.players||[]).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("")}
+      </select></div>
+    <h3>Override a pick</h3>
+    <p class="tiny muted">Works after kickoff. Every change writes to the audit log with the old value.</p>
+    ${ gs.map(g=>{
+      const sides = g.betType==="total" ? ["over","under"] : [g.away,g.home];
+      return `<div class="game"><div class="game-hd">
+        <div><b>${g.away} @ ${g.home}</b>
+          <div class="tiny muted mono">${fmtKick(g.kickoff)}${isLocked(g)?" · locked":""}</div></div></div>
+        <div class="row">
+          ${sides.map(s=>`<button onclick="adminSetPick('${g.id}','${s}')">${esc(sideLabel(g,s))} ${sideLine(g,s)}</button>`).join("")}
+          <button class="danger" onclick="adminSetPick('${g.id}','')">Clear</button>
+        </div></div>`;
+    }).join("") || `<p class="muted">No games posted.</p>` }
+  </div>`;
+}
+
+function adminPlayers(){
+  return `<div class="card"><h3>Players</h3>
+    <div class="scroll"><table><thead><tr><th>Name</th><th>Passcode</th><th>Admin</th></tr></thead><tbody>
+    ${(pool.players||[]).map((p,i)=>`<tr>
+      <td><input value="${esc(p.name)}" onchange="editPlayer(${i},'name',this.value)"></td>
+      <td><input value="${esc(p.passcode)}" style="width:96px" onchange="editPlayer(${i},'passcode',this.value)"></td>
+      <td>${p.isAdmin?'<span class="pill">Admin</span>':""}</td></tr>`).join("")}
+    </tbody></table></div></div>
+    <div class="card"><h3>Tiebreakers</h3>
+    <div class="scroll"><table><thead><tr><th>Player</th><th>TD scorer</th><th>Submitted</th></tr></thead><tbody>
+    ${(pool.players||[]).map(p=>{ const t=(pool.tiebreakers||{})[p.id]||{};
+      return `<tr><td>${esc(p.name)}</td><td>${esc(t.text||"—")}</td>
+        <td class="tiny muted mono">${t.at?fmtKick(t.at):"—"}</td></tr>`;}).join("")}
+    </tbody></table></div></div>`;
+}
+
+let auditRows = [];
+function adminAudit(){
+  return `<div class="card"><h3>Audit log</h3>
+    <p class="tiny muted">Every admin change to a line, score, or pick.</p>
+    <button onclick="loadAudit()">Load</button>
+    <div class="scroll" style="margin-top:10px"><table><thead><tr>
+      <th>When</th><th>Who</th><th>Action</th><th>Before</th><th>After</th></tr></thead><tbody>
+      ${auditRows.map(r=>`<tr><td class="tiny mono">${fmtKick(r.at)}</td><td class="tiny">${esc(r.admin)}</td>
+        <td class="tiny">${esc(r.action)}</td><td class="tiny muted">${esc(r.before||"—")}</td>
+        <td class="tiny">${esc(r.after||"—")}</td></tr>`).join("")
+        || `<tr><td colspan="5" class="muted tiny">Nothing loaded.</td></tr>`}
+    </tbody></table></div></div>`;
+}
+
+/* ============================================================
+   12. ACTIONS
+   ============================================================ */
+window.go  = k => { tab=k; render(); };
+window.goA = k => { atab=k; render(); };
+window.setView = v => { viewWeek=v; render(); };
+
+window.signIn = () => {
+  const id = document.getElementById("who").value;
+  const pc = document.getElementById("pc").value.trim();
+  const p  = (pool.players||[]).find(x=>x.id===id);
+  if(!p || p.passcode!==pc){ flash={kind:"err",msg:"That passcode doesn't match."}; render(); return; }
+  me = p; localStorage.setItem("ffp_player",p.id); viewWeek = pool.currentWeek; render();
+};
+window.signOut = () => { me=null; localStorage.removeItem("ffp_player"); render(); };
+
+window.togglePick = async (gameId, side) => {
+  const g = games.find(x=>x.id===gameId);
+  if(!g || isLocked(g)){ flash={kind:"err",msg:"That game already kicked off."}; render(); return; }
+  const existing = picks.find(p=>p.playerId===me.id && p.gameId===gameId);
+  const id = `${g.week}_${me.id}_${gameId}`;
+  if(existing && existing.side===side){ await deleteDoc(doc(db,"picks",id)); return; }
+  if(!existing && myPicks(g.week,me.id).length >= requiredFor(g.week)){
+    flash={kind:"err",msg:`You already have ${requiredFor(g.week)} picks this week.`}; render(); return;
+  }
+  await setDoc(doc(db,"picks",id), { season:SEASON, week:g.week, playerId:me.id,
+    gameId, side, at:new Date().toISOString() });
+};
+
+window.saveTiebreak = async () => {
+  const v = document.getElementById("tbv").value.trim();
+  const sb = weekGames("SB")[0];
+  if(sb && isLocked(sb)){ flash={kind:"err",msg:"Super Bowl already kicked off."}; render(); return; }
+  await updateDoc(POOL,{ [`tiebreakers.${me.id}`]: { text:v, at:new Date().toISOString() } });
+  flash={kind:"ok",msg:"Tiebreaker saved."}; render();
+};
+
+window.previewSlate = () => {
+  const {games:gs, errs} = parseSlate(document.getElementById("slate").value, viewWeek);
+  document.getElementById("preview").innerHTML =
+    (errs.length?`<div class="err" style="margin-top:10px">${errs.map(esc).join("<br>")}</div>`:"") +
+    (gs.length?`<div class="card" style="margin-top:10px"><table><thead><tr>
+      <th>Game</th><th>Posts as</th><th>Kickoff</th></tr></thead><tbody>
+      ${gs.map(g=>`<tr><td>${g.away} @ ${g.home}</td>
+        <td class="mono">${g.betType==="total"?"O/U "+fmtNum(g.line):g.favorite+" -"+fmtNum(g.line)}</td>
+        <td class="tiny mono">${fmtKick(g.kickoff)}</td></tr>`).join("")}
+      </tbody></table></div>`:"");
+};
+
+window.publishSlate = async () => {
+  const {games:gs, errs} = parseSlate(document.getElementById("slate").value, viewWeek);
+  if(errs.length){ window.previewSlate(); flash={kind:"err",msg:"Fix the errors first."}; render(); return; }
+  if(!gs.length){ flash={kind:"err",msg:"Nothing to publish."}; render(); return; }
+  const batch = writeBatch(db);
+  gs.forEach(g=> batch.set(doc(GAMES), g));
+  await batch.commit();
+  await logAudit("publish lines", null, {week:viewWeek, count:gs.length});
+  flash={kind:"ok",msg:`Posted ${gs.length} games for ${weekById(viewWeek).label}.`};
+  document.getElementById("slate").value=""; render();
+};
+
+window.editLine = async (id, val) => {
+  const g = games.find(x=>x.id===id); if(!g) return;
+  const before = {favorite:g.favorite, line:g.line};
+  let upd;
+  const tot = val.toUpperCase().match(/^(?:O\/U\s*)?(\d+(?:\.\d+)?)$/);
+  if(g.betType==="total" && tot){ upd={line:hook(tot[1])}; }
+  else {
+    const m = val.toUpperCase().match(/^([A-Z]{2,3})\s*-?\s*(\d+(?:\.\d+)?)$/);
+    if(!m || (m[1]!==g.away && m[1]!==g.home)){ flash={kind:"err",msg:"Use e.g. SEA -3.5"}; render(); return; }
+    upd = {favorite:m[1], line:hook(m[2])};
+  }
+  await updateDoc(doc(db,"games",id), upd);
+  await logAudit("edit line", {game:`${g.away}@${g.home}`, ...before}, upd);
+  flash={kind:"ok",msg:"Line changed and logged."}; render();
+};
+
+window.delGame = async id => {
+  const g = games.find(x=>x.id===id); if(!g) return;
+  if(!confirm(`Delete ${g.away} @ ${g.home}? Picks on it go too.`)) return;
+  const kids = picks.filter(p=>p.gameId===id);
+  const batch = writeBatch(db);
+  kids.forEach(p=>batch.delete(doc(db,"picks",p.id)));
+  batch.delete(doc(db,"games",id));
+  await batch.commit();
+  await logAudit("delete game", {game:`${g.away}@${g.home}`, picks:kids.length}, null);
+  flash={kind:"ok",msg:"Game deleted."}; render();
+};
+
+window.clearWeek = async wk => {
+  const gs = weekGames(wk), ps = picks.filter(p=>p.week===String(wk));
+  if(!gs.length && !ps.length){ flash={kind:"err",msg:"Nothing to clear."}; render(); return; }
+  if(!confirm(`Delete ${gs.length} games and ${ps.length} picks from ${weekById(wk).label}? Can't be undone.`)) return;
+  const batch = writeBatch(db);
+  ps.forEach(p=>batch.delete(doc(db,"picks",p.id)));
+  gs.forEach(g=>batch.delete(doc(db,"games",g.id)));
+  await batch.commit();
+  await logAudit("clear week", {week:wk, games:gs.length, picks:ps.length}, null);
+  flash={kind:"ok",msg:`${weekById(wk).label} cleared.`}; render();
+};
+
+window.setScore = async (id, field, val) => {
+  const g = games.find(x=>x.id===id); if(!g) return;
+  const before = {awayScore:g.awayScore, homeScore:g.homeScore};
+  const v = val===""?null:Number(val);
+  await updateDoc(doc(db,"games",id), {[field]:v});
+  await logAudit("enter score", {game:`${g.away}@${g.home}`, ...before}, {[field]:v});
+};
+
+window.finalize = async (wk, on) => {
+  await updateDoc(POOL,{ [`finalized.${wk}`]: on });
+  await logAudit(on?"finalize week":"reopen week", null, {week:wk});
+  flash={kind:"ok",msg:on?`${weekById(wk).label} finalized.`:`${weekById(wk).label} reopened.`}; render();
+};
+
+window.setCurrentWeek = async () => {
+  const v = document.getElementById("cw").value;
+  await updateDoc(POOL,{currentWeek:v});
+  flash={kind:"ok",msg:"Current week set."}; render();
+};
+
+window.adminSetPick = async (gameId, side) => {
+  const pid = document.getElementById("apw").value;
+  const g = games.find(x=>x.id===gameId); if(!g) return;
+  const id = `${g.week}_${pid}_${gameId}`;
+  const before = picks.find(p=>p.id===id);
+  if(side===""){
+    if(before) await deleteDoc(doc(db,"picks",id));
+    await logAudit("admin clear pick", before?{player:pid,side:before.side}:null, null);
+  } else {
+    await setDoc(doc(db,"picks",id), { season:SEASON, week:g.week, playerId:pid,
+      gameId, side, at:new Date().toISOString(), byAdmin:true });
+    await logAudit("admin set pick", before?{player:pid,side:before.side}:null,
+      {player:pid, game:`${g.away}@${g.home}`, side});
+  }
+  flash={kind:"ok",msg:"Pick changed and logged."}; render();
+};
+
+window.editPlayer = async (i, field, val) => {
+  const pls = JSON.parse(JSON.stringify(pool.players||[]));
+  const before = {...pls[i]};
+  pls[i][field] = val;
+  await updateDoc(POOL,{players:pls});
+  await logAudit("edit player", before, pls[i]);
+  if(me && me.id===pls[i].id) me = pls[i];
+};
+
+window.loadAudit = async () => {
+  const { getDocs, orderBy, limit } =
+    await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+  const snap = await getDocs(query(AUDIT, orderBy("at","desc"), limit(200)));
+  auditRows = snap.docs.map(d=>d.data());
+  render();
+};
+
+boot();
+</script>
+</body>
+</html>
