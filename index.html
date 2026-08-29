@@ -558,6 +558,11 @@ function adminLines(){
       <span class="mono">SEA -3</span> posts as <span class="mono">-3.5</span>. Nothing pushes.</p>
     <div class="row" style="margin-bottom:8px">
       <button onclick="fetchLines()">Fetch current lines</button>
+      <select id="fetchdays" style="max-width:150px">
+        <option value="8">Next 8 days</option>
+        <option value="14" selected>Next 14 days</option>
+        <option value="21">Next 21 days</option>
+      </select>
       <span class="tiny muted">Fills the box below. Nothing is posted until you publish.</span>
     </div>
     <div id="fetchnote"></div>
@@ -720,12 +725,19 @@ window.saveTiebreak = async () => {
 
 window.fetchLines = async () => {
   const note = document.getElementById("fetchnote");
+  const days = document.getElementById("fetchdays").value;
   note.innerHTML = `<p class="tiny muted">Fetching…</p>`;
   try{
-    const r = await fetch("/api/lines?days=8");
+    const r = await fetch("/api/lines?days="+days);
     const d = await r.json();
     if(!r.ok){ note.innerHTML = `<div class="err">${esc(d.error||"Fetch failed")}${
         d.detail?`<br><span class="tiny">${esc(d.detail)}</span>`:""}</div>`; return; }
+    if(!d.count){
+      note.innerHTML = `<div class="err">No games kicking off in the next ${esc(days)} days.
+        ${d.upcoming?`Next one on the board is ${esc(d.upcoming)} — widen the window.`
+                    :"The book may not have posted lines yet."}</div>`;
+      return;
+    }
     document.getElementById("slate").value = d.text;
     note.innerHTML = `<div class="ok">Pulled ${d.count} games.${
       d.remaining?` ${esc(d.remaining)} API credits left this month.`:""}

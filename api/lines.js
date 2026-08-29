@@ -85,8 +85,17 @@ export default async function handler(req, res){
         rows.push(`${away.padEnd(3)} @ ${home.padEnd(3)} | ${spread.padEnd(9)} | ${etStamp(e.commence_time)}`);
       });
 
+    // If the window caught nothing, say when the next game actually is so the
+    // caller knows whether to widen it or whether the book hasn't posted yet.
+    let upcoming = null;
+    if(!rows.length && events.length){
+      const next = events
+        .map(e=>e.commence_time).sort()[0];
+      if(next) upcoming = etStamp(next);
+    }
+
     res.setHeader("Cache-Control","no-store");
-    return res.status(200).json({ text: rows.join("\n"), count: rows.length, skipped, remaining });
+    return res.status(200).json({ text: rows.join("\n"), count: rows.length, skipped, remaining, upcoming });
 
   }catch(err){
     return res.status(500).json({error:"Fetch failed", detail:String(err.message)});
