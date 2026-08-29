@@ -1,0 +1,81 @@
+rules_version = '2';
+
+// Family Football Pool — Firestore rules
+//
+// The point of this file: the kickoff lock must live here, not in the UI.
+// The buttons in index.html grey out after kickoff, but that's cosmetic —
+// anyone who opens the browser console can write a pick Sunday night
+// otherwise. These rules make the standings unarguable.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function game(id) {
+      return get(/databases/$(database)/documents/games/$(id)).data;
+    }
+
+    // Pool doc: readable by all, writable (players list, finalized weeks,
+    // tiebreakers) from the admin screen.
+    match /pool/{id} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Games: read freely. Writes come from the admin screen only.
+    match /games/{id} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Picks: THE important rule.
+    // A pick may only be created, changed, or deleted while the game it
+    // refers to has not kicked off. request.time is the server's clock, so
+    // a doctored device clock doesn't help.
+    match /picks/{id} {
+      allow read: if true;
+
+      // kickoffMs is epoch milliseconds. Rules cannot parse the ISO string,
+      // so the app writes both and this compares against the number.
+      allow create, update: if
+        request.resource.data.gameId is string &&
+        request.time < timestamp.value(game(request.resource.data.gameId).kickoffMs);
+
+      allow delete: if
+        request.time < timestamp.value(game(resource.data.gameId).kickoffMs);
+    }
+
+    // Audit: append-only. Nobody edits or deletes history, including Tim.
+    match /audit/{id} {
+      allow read:   if true;
+      allow create: if true;
+      allow update, delete: if false;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------
+// KNOWN GAP — read this before Sept 9.
+//
+// Because sign-in is a shared passcode rather than Firebase Auth, these
+// rules can tell WHEN a write happens but not WHO is making it. That has
+// one consequence: the admin override you asked for (changing a pick after
+// kickoff) is blocked by the same rule that blocks everyone else.
+//
+// Three ways to handle it, cheapest first:
+//
+// 1. Do nothing. Post-kickoff overrides are rare. When you need one,
+//    temporarily comment out the picks create/update rule, make the change,
+//    put it back. The audit row still records it.
+//
+// 2. Add Firebase Anonymous Auth plus a custom claim for your uid, then
+//    change the rule to:
+//      allow create, update: if request.auth.token.admin == true ||
+//        request.time < timestamp.value(game(...).kickoff);
+//    About an hour of work and it makes the whole thing airtight.
+//
+// 3. Route admin writes through a Cloud Function, like the run pool's
+//    alert functions. Most work, most correct.
+//
+// Option 1 is fine for four family members. Worth knowing it's a choice
+// rather than an oversight.
+// ---------------------------------------------------------------------

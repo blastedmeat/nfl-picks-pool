@@ -476,9 +476,12 @@ function renderBoard(){
   const rows = gs.map(g=>{
     const locked = isLocked(g), res = gameResult(g);
     const cells = pls.map(pl=>{
+      // Before kickoff every cell looks the same, picked or not. Showing
+      // "Hidden" only where a pick exists would leak which games each
+      // person took, which is most of the strategy in a pick-5-of-16 pool.
+      if(!locked) return `<td class="muted">—</td>`;
       const p = picks.find(x=>x.week===String(wk)&&x.playerId===pl.id&&x.gameId===g.id);
       if(!p) return `<td class="muted">—</td>`;
-      if(!locked) return `<td><span class="pill">Hidden</span></td>`;
       const won = res==null?null:(res===p.side);
       return `<td><span class="pill ${won===null?"":won?"win":"loss"}">${esc(sideLabel(g,p.side))}</span></td>`;
     }).join("");
@@ -491,9 +494,12 @@ function renderBoard(){
 
   return `<div class="row" style="margin-bottom:12px">${renderWeekPicker()}</div>
     <div class="card"><p class="tiny muted" style="margin:0 0 10px">
-      Picks stay hidden until each game kicks off.</p>
+      Every pick stays hidden until its own game kicks off. The count under each name
+      shows how many picks that player has in, not which games.</p>
       <div class="scroll"><table><thead><tr><th>Game</th>
-      ${pls.map(p=>`<th>${esc(p.name)}</th>`).join("")}</tr></thead>
+      ${pls.map(p=>{ const n = myPicks(wk,p.id).length;
+        return `<th>${esc(p.name)}<div class="tiny mono" style="font-weight:400;text-transform:none">${n}/${requiredFor(wk)}</div></th>`;
+      }).join("")}</tr></thead>
       <tbody>${rows}</tbody></table></div></div>`;
 }
 
@@ -548,8 +554,13 @@ function adminLines(){
   return `<div class="card">
     <div class="row" style="margin-bottom:10px">${renderWeekPicker()}</div>
     <h3>Paste the slate</h3>
-    <p class="tiny muted">One game per line. Whole numbers get a hook toward the favorite automatically —
+    <p class="tiny muted">Whole numbers get a hook toward the favorite automatically —
       <span class="mono">SEA -3</span> posts as <span class="mono">-3.5</span>. Nothing pushes.</p>
+    <div class="row" style="margin-bottom:8px">
+      <button onclick="fetchLines()">Fetch current lines</button>
+      <span class="tiny muted">Fills the box below. Nothing is posted until you publish.</span>
+    </div>
+    <div id="fetchnote"></div>
     <textarea id="slate" placeholder="NE @ SEA | SEA -3 | 9/9 8:20p
 BAL @ IND | BAL -2.5 | 9/13 1:00p
 LV @ CLE | PK | 9/13 1:00p
@@ -705,6 +716,25 @@ window.saveTiebreak = async () => {
   if(sb && isLocked(sb)){ flash={kind:"err",msg:"Super Bowl already kicked off."}; render(); return; }
   await updateDoc(POOL,{ [`tiebreakers.${me.id}`]: { text:v, at:new Date().toISOString() } });
   flash={kind:"ok",msg:"Tiebreaker saved."}; render();
+};
+
+window.fetchLines = async () => {
+  const note = document.getElementById("fetchnote");
+  note.innerHTML = `<p class="tiny muted">Fetching…</p>`;
+  try{
+    const r = await fetch("/api/lines?days=8");
+    const d = await r.json();
+    if(!r.ok){ note.innerHTML = `<div class="err">${esc(d.error||"Fetch failed")}${
+        d.detail?`<br><span class="tiny">${esc(d.detail)}</span>`:""}</div>`; return; }
+    document.getElementById("slate").value = d.text;
+    note.innerHTML = `<div class="ok">Pulled ${d.count} games.${
+      d.remaining?` ${esc(d.remaining)} API credits left this month.`:""}
+      Check it, then Preview and Publish.</div>` +
+      (d.skipped && d.skipped.length
+        ? `<div class="err">Skipped: ${d.skipped.map(esc).join(", ")}</div>` : "");
+  }catch(e){
+    note.innerHTML = `<div class="err">${esc(e.message)}</div>`;
+  }
 };
 
 window.previewSlate = () => {
